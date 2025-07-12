@@ -1,0 +1,224 @@
+# =======================
+# ✅ 1. Install Libraries
+# =======================
+!pip install --upgrade --force-reinstall numpy
+!pip install ultralytics==8.2.67
+!pip install mediapipe==0.10.17
+!pip install opencv-python==4.9.0.80
+!pip install matplotlib==3.7.5
+!pip install ultralytics mediapipe opencv-python matplotlib pyyaml --quiet
+
+# After installing, restart runtime from menu: Runtime > Restart Runtime
+
+# =======================
+# ✅ 2. Import Libraries
+# =======================
+import os
+import cv2
+import numpy as np
+import matplotlib.pyplot as plt
+import zipfile
+from google.colab import files
+from ultralytics import YOLO
+import mediapipe as mp
+import ultralytics
+import yaml
+
+# Print versions to verify
+print("\nVersions:")
+print(f"NumPy: {np.__version__}")
+print(f"OpenCV: {cv2.__version__}")
+print(f"MediaPipe: {mp.__version__}")
+print(f"Ultralytics: {ultralytics.__version__}")
+
+# =======================
+# ✅ 3. Setup FaceMesh
+# =======================
+mp_face_mesh = mp.solutions.face_mesh
+mp_drawing = mp.solutions.drawing_utils
+
+# Define face regions by landmark points
+FACIAL_REGIONS = {
+    "LEFT_CHEEK": [234, 93, 132, 58],
+    "RIGHT_CHEEK": [454, 323, 361, 288],
+    "FOREHEAD": [10, 338, 297, 67],
+    "UNDER_EYES": [145, 159, 153, 133, 243, 280]
+}
+
+# Function to crop facial regions from image
+def get_facial_regions(image):
+    with mp_face_mesh.FaceMesh(static_image_mode=True, max_num_faces=1, min_detection_confidence=0.5) as face_mesh:
+        results = face_mesh.process(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+        regions = {}
+        if results.multi_face_landmarks:
+            h, w, _ = image.shape
+            face_landmarks = results.multi_face_landmarks[0]
+            points = [(int(p.x * w), int(p.y * h)) for p in face_landmarks.landmark]
+            for region_name, indices in FACIAL_REGIONS.items():
+                xs = [points[i][0] for i in indices]
+                ys = [points[i][1] for i in indices]
+                x1, x2 = max(min(xs) - 10, 0), min(max(xs) + 10, w)
+                y1, y2 = max(min(ys) - 10, 0), min(max(ys) + 10, h)
+                regions[region_name] = image[y1:y2, x1:x2]
+        return regions
+    return {}
+
+# Function to draw acne boxes
+def visualize_results(image, results):
+    img_with_boxes = image.copy()
+    for box in results.boxes:
+        x1, y1, x2, y2 = map(int, box.xyxy[0])
+        conf = box.conf[0]
+        cv2.rectangle(img_with_boxes, (x1, y1), (x2, y2), (0, 255, 0), 2)
+        label = f"Acne: {conf:.2f}"
+        cv2.putText(img_with_boxes, label, (x1, y1 - 10),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+    return img_with_boxes
+
+# Main processing function
+def process_image(image_path, model):
+    original_image = cv2.imread(image_path)
+    if original_image is None:
+        print(f"Error: Could not read image at {image_path}")
+        return
+    original_image = cv2.cvtColor(original_image, cv2.COLOR_BGR2RGB)
+    facial_regions = get_facial_regions(original_image)
+    
+    fig, axes = plt.subplots(2, 3, figsize=(20, 15))
+    axes[0, 0].imshow(original_image)
+    axes[0, 0].set_title("Original Image")
+    axes[0, 0].axis('off')
+
+    acne_counts = {}
+    for i, (region_name, region_img) in enumerate(facial_regions.items()):
+        results = model.predict(source=region_img, conf=0.25, imgsz=640)
+        acne_count = len(results[0].boxes)
+        acne_counts[region_name] = acne_count
+        region_with_boxes = visualize_results(region_img, results[0])
+        row, col = (i + 1) // 3, (i + 1) % 3
+        axes[row, col].imshow(region_with_boxes)
+        axes[row, col].set_title(f"{region_name} - Acne: {acne_count}")
+        axes[row, col].axis('off')
+
+    for j in range(len(facial_regions) + 1, 6):
+        row, col = j // 3, j % 3
+        fig.delaxes(axes[row, col])
+    plt.tight_layout()
+    plt.show()
+
+    print("\nAcne Distribution Summary:")
+    for region, count in acne_counts.items():
+        print(f"{region}: {count} acne spots")
+
+    total_acne = sum(acne_counts.values())
+    print(f"\nTotal acne detected: {total_acne}")
+    if total_acne == 0:
+        severity = "Clear"
+    elif total_acne <= 5:
+        severity = "Mild"
+    elif total_acne <= 10:
+        severity = "Moderate"
+    else:
+        severity = "Severe"
+    print(f"\nAcne Severity: {severity}")
+
+# =======================
+# ✅ 4. Upload & Extract Dataset
+# =======================
+print("Step 1/2: Upload the acne dataset ZIP file")
+uploaded = files.upload()
+
+zip_filename = None
+for filename in uploaded.keys():
+    if filename.endswith('.zip'):
+        zip_filename = filename
+        break
+if not zip_filename:
+    raise FileNotFoundError("No ZIP file found in the upload.")
+
+print("\nStep 2/2: Extracting dataset...")
+extract_path = '/content/acne_data_extracted'
+os.makedirs(extract_path, exist_ok=True)
+with zipfile.ZipFile(zip_filename, 'r') as zip_ref:
+    zip_ref.extractall(extract_path)
+print("✅ Dataset extracted successfully!")
+
+# List contents
+print(f"Contents of {extract_path}:")
+print(os.listdir(extract_path))
+
+# =======================
+# ✅ 5. Fix YAML Path
+# =======================
+extract_path = '/content/acne_data_extracted/data-2'
+data_yaml_path = os.path.join(extract_path, 'data.yaml')
+
+if not os.path.exists(data_yaml_path):
+    raise FileNotFoundError(f"data.yaml not found at {data_yaml_path}")
+
+# Load and update paths in data.yaml
+with open(data_yaml_path, 'r') as f:
+    data_yaml_content = yaml.safe_load(f)
+
+data_yaml_content['train'] = os.path.join(extract_path, 'train')
+data_yaml_content['val'] = os.path.join(extract_path, 'valid')
+if 'test' in data_yaml_content:
+    data_yaml_content['test'] = os.path.join(extract_path, 'test')
+
+# Save updated YAML
+with open(data_yaml_path, 'w') as f:
+    yaml.dump(data_yaml_content, f)
+
+print(f"\n✅ Updated data.yaml file saved to: {data_yaml_path}")
+
+# =======================
+# ✅ 6. Train YOLOv8
+# =======================
+print("="*60)
+print("🚀 ACNE DETECTION SYSTEM WITH YOLOv8")
+print("="*60)
+
+model = YOLO("yolov8n.pt")
+results = model.train(
+    data=data_yaml_path,
+    epochs=50,
+    imgsz=640,
+    batch=16,
+    name='acne_detection',
+    save=True,
+    val=True
+)
+
+# =======================
+# ✅ 7. Load Best Model
+# =======================
+runs_dir = 'runs/detect'
+latest_run = sorted([d for d in os.listdir(runs_dir) if os.path.isdir(os.path.join(runs_dir, d)) and d.startswith('acne_detection')])[-1]
+best_model_path = os.path.join(runs_dir, latest_run, 'weights', 'best.pt')
+print(f"✅ Best model saved to: {best_model_path}")
+
+# =======================
+# ✅ 8. Upload & Detect Face Image
+# =======================
+print("\n📸 Upload a face image (JPG/PNG) for acne detection")
+uploaded = files.upload()
+
+image_path = None
+for filename in uploaded.keys():
+    if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
+        image_path = filename
+        break
+if not image_path:
+    raise FileNotFoundError("No valid image file found")
+
+trained_model = YOLO(best_model_path)
+
+print("\n🔬 Processing image...")
+process_image(image_path, trained_model)
+print("✅ Process completed!")
+
+# =======================
+# ✅ 9. Download Model
+# =======================
+from google.colab import files
+files.download(best_model_path)
