@@ -1,60 +1,86 @@
-# 🧴 Acne Detection Using YOLOv8 and MediaPipe
+# 🧴 Acne Detection with YOLOv8 + MediaPipe (Full Pipeline)
 
-This project is a smart, deep-learning-powered solution that detects **acne in specific facial regions** using a custom-trained YOLOv8 model. It combines **facial landmark detection** via MediaPipe with **object detection** via YOLOv8 to provide a region-wise analysis — such as acne on the **cheeks**, **forehead**, or **under the eyes** — instead of just binary classification.
+This project provides a complete, deep learning-based pipeline to **detect acne across different facial regions** using **YOLOv8** and **MediaPipe Face Mesh**. It goes beyond binary classification by breaking the face into regions (cheeks, forehead, under-eyes) and detecting acne spots individually in each.
+
+It includes:
+- 📦 Dataset upload and extraction
+- 🧠 YOLOv8 model training
+- 📸 Face image upload and detection
+- 📥 Model download for future use
 
 ---
 
 ## 🧠 What It Does
 
-✅ Automatically detects acne on a person's face image  
-✅ Divides the face into regions:
+✅ Upload and process acne dataset (YOLOv8 format)  
+✅ Automatically updates `data.yaml` paths after extraction  
+✅ Trains a YOLOv8 model (`yolov8n.pt`) on the dataset  
+✅ Uploads a user face image and detects acne  
+✅ Divides the face into key regions using MediaPipe:
 - Left Cheek
 - Right Cheek
 - Forehead
 - Under Eyes  
-✅ Uses **MediaPipe Face Mesh** to extract facial landmarks and regions  
-✅ Uses a **YOLOv8 model** trained on real acne images to detect acne spots  
-✅ Classifies acne severity as:
+✅ Detects acne spots in each region using the trained model  
+✅ Shows acne count per region and **classifies severity**:
 - `Clear`
 - `Mild`
 - `Moderate`
 - `Severe`  
-✅ Visualizes detection results using bounding boxes and confidence scores  
-
----
-
-## 🔧 Tech Stack
-
-| Tool/Library     | Purpose                                 |
-|------------------|------------------------------------------|
-| 🟣 YOLOv8         | Object detection (Ultralytics v8.2.67)   |
-| 🟢 MediaPipe      | Facial landmark detection                |
-| 🖼️ OpenCV         | Image reading and preprocessing          |
-| 📊 wandb.ai       | Model training tracking and visualization |
-| 📈 Matplotlib     | Display detection results                |
-| 💻 Google Colab   | Environment used for training & testing  |
+✅ Downloads the best-trained model (`best.pt`) at the end
 
 ---
 
 ## 📚 Dataset Used
 
-**Kaggle Dataset**: Acne Detection Dataset in YOLOv8 Format  
-📎 [View Dataset on Kaggle](https://www.kaggle.com/datasets/osmankagankurnaz/acne-dataset-in-yolov8-format)
+**Kaggle Dataset**: [Acne Dataset in YOLOv8 Format](https://www.kaggle.com/datasets/osmankagankurnaz/acne-dataset-in-yolov8-format)
 
-This dataset contains labeled images of faces with acne annotations in YOLO format, ideal for training object detection models.
-
----
-
-## 📸 Output Sample
-
-> 🔍 Face regions are scanned individually.  
-> ✅ Acne spots are marked with bounding boxes.  
-> 📊 Summary includes region-wise acne counts and total severity.
-
+- Format: YOLOv8-compliant
+- Includes: train/valid/test splits with bounding boxes for acne
 
 ---
 
+## 🛠 Tech Stack
 
-## 📄 License
+| Library         | Purpose                                |
+|----------------|-----------------------------------------|
+| 🔮 YOLOv8 (Ultralytics) | Object detection model (acne)      |
+| 🟢 MediaPipe     | Detect facial landmarks and regions    |
+| 🎨 OpenCV        | Image handling and preprocessing       |
+| 📊 Matplotlib    | Visualization of results               |
+| 📁 PyYAML        | Read and modify `data.yaml` file       |
+| 🧪 Google Colab  | Runtime and interactive interface      |
 
-This project is licensed under the MIT License.
+---
+
+## 🚀 How to Use (Colab)
+
+> **Note:** This pipeline is designed for Google Colab usage.
+
+1. **Upload your acne dataset ZIP** (from Kaggle)
+2. The notebook extracts and updates the paths in `data.yaml`
+3. YOLOv8 training starts using `yolov8n.pt`
+4. Upload a **face image** (JPG or PNG)
+5. Model detects acne region-wise using MediaPipe + YOLO
+6. Results are displayed with bounding boxes and counts
+7. You get a severity level + option to **download trained model**
+
+---
+
+## 🎯 Output Example
+
+After running, you’ll get:
+
+- 📸 An image with bounding boxes over acne spots
+- 📊 A printed region-wise acne count
+- 🚦 Severity level based on total detected spots
+
+```text
+Acne Distribution Summary:
+LEFT_CHEEK: 2 acne spots
+RIGHT_CHEEK: 4 acne spots
+FOREHEAD: 1 acne spots
+UNDER_EYES: 3 acne spots
+
+Total acne detected: 10
+Acne Severity: Moderate
